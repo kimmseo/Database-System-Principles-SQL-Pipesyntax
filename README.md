@@ -2,3 +2,5 @@
 
 ---
 
+# If query cannot be executed
+check preprocessing.py and edit your details

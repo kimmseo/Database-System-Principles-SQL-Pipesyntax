@@ -1,30 +1,23 @@
-import interface
-import sv_ttk
-from tkinter import ttk,Tk
+from interface import launch_gui
 
-# Main tkinter window
-root = Tk()
-root.resizable(width = False, height = False)
-root.title("Pipe-syntax SQL from QEP")
+if __name__ == "__main__":
+    launch_gui()
 
-# root size is (1,1)
-root.grid_rowconfigure(0, weight=1)
-root.grid_columnconfigure(0, weight=1)
 
-# Define login and main app frames
-login_frame = ttk.Frame(root)
-app_frame = ttk.Frame(root)
+# Simple test query
+# Select * FROM nation WHERE n_nationkey = 1
 
-# Assign both frames to the root partition and take up all available space
-login_frame.grid(row=0, column=0, sticky="nsew")
-app_frame.grid(row=0, column=1, sticky="nsew")
 
-# Create both frames
-
-# Show login_frame
-
-# tkinter theme
-sv_ttk.set_theme("dark")
-
-# Start the UI thread
-root.mainloop()
+# Sample test query (assessment)
+'''
+SELECT c_count, count(*) AS custdist
+FROM
+ (SELECT c_custkey, count(o_orderkey)
+ FROM customer LEFT OUTER JOIN orders
+ ON c_custkey = o_custkey
+ AND o_comment not like '%unusual%packages%'
+ GROUP BY c_custkey
+ ) as c_orders (c_custkey, c_count)
+GROUP BY c_count
+ORDER BY custdist DESC, c_count DESC;
+'''
