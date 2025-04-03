@@ -3,7 +3,7 @@ from tkinter import ttk, Tk, scrolledtext, StringVar
 
 from preprocessing import get_qep
 from pipesyntax import generate_pipe_syntax
-
+from tkinter import messagebox 
 
 def launch_gui():
     root = Tk()
@@ -35,6 +35,10 @@ def launch_gui():
         entry.pack(side="left")
 
     def handle_login():
+        if not (host.get() and port.get() and user.get() and password.get() and dbname.get()):
+            messagebox.showerror("Login Error", "All fields must be filled in.")
+            return
+    
         root.db_config = {
             "host": host.get(),
             "port": port.get(),
@@ -42,6 +46,15 @@ def launch_gui():
             "password": password.get(),
             "dbname": dbname.get()
         }
+        
+        try:
+            import psycopg2
+            conn = psycopg2.connect(**root.db_config)
+            conn.close()
+        except Exception as e:
+            messagebox.showerror("Connection Failed", f"Could not connect to the database:\n{e}")
+            return
+        
         app_frame.tkraise()
 
     ttk.Button(login_frame, text="Connect", command=handle_login).pack(pady=10)
@@ -56,12 +69,18 @@ def launch_gui():
 
     def run_query():
         sql = query_input.get("1.0", "end").strip()
-        qep = get_qep(sql, db_config=root.db_config)
-        pipe_sql = generate_pipe_syntax(qep)
-
-        output.delete("1.0", "end")
-        output.insert("1.0", pipe_sql)
-
+        if not sql:
+            messagebox.showwarning("No Query", "Please enter an SQL query.")
+            return
+        try:
+            qep = get_qep(sql, db_config=root.db_config)
+            pipe_sql = generate_pipe_syntax(qep)
+            output.delete("1.0", "end")
+            output.insert("1.0", pipe_sql)
+        except Exception as e:
+            output.delete("1.0", "end")
+            messagebox.showerror("Query Failed", f"An error occurred:\n{e}")
+            
     ttk.Button(app_frame, text="Generate Pipe-Syntax", command=run_query).pack()
 
     login_frame.tkraise()
