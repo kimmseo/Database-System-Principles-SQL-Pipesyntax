@@ -1,9 +1,8 @@
 import sv_ttk
-from tkinter import ttk, Tk, scrolledtext, StringVar
-
+from tkinter import ttk, Tk, scrolledtext, StringVar, BooleanVar
 from preprocessing import get_qep
 from pipesyntax import generate_pipe_syntax
-from tkinter import messagebox 
+from tkinter import messagebox
 
 def launch_gui():
     root = Tk()
@@ -11,6 +10,8 @@ def launch_gui():
     root.title("Pipe-syntax SQL from QEP")
     root.geometry("800x600")
     sv_ttk.set_theme("dark")
+
+    root.last_qep = None  # Store the last QEP for toggling cost
 
     login_frame = ttk.Frame(root)
     app_frame = ttk.Frame(root)
@@ -38,7 +39,7 @@ def launch_gui():
         if not (host.get() and port.get() and user.get() and password.get() and dbname.get()):
             messagebox.showerror("Login Error", "All fields must be filled in.")
             return
-    
+
         root.db_config = {
             "host": host.get(),
             "port": port.get(),
@@ -46,7 +47,7 @@ def launch_gui():
             "password": password.get(),
             "dbname": dbname.get()
         }
-        
+
         try:
             import psycopg2
             conn = psycopg2.connect(**root.db_config)
@@ -54,7 +55,7 @@ def launch_gui():
         except Exception as e:
             messagebox.showerror("Connection Failed", f"Could not connect to the database:\n{e}")
             return
-        
+
         app_frame.tkraise()
 
     ttk.Button(login_frame, text="Connect", command=handle_login).pack(pady=10)
@@ -67,6 +68,18 @@ def launch_gui():
     output = scrolledtext.ScrolledText(app_frame, height=15)
     output.pack(fill="x", padx=10, pady=10)
 
+    show_cost_var = BooleanVar(value=True)
+
+    def update_output_from_toggle():
+        if root.last_qep:
+            pipe_sql = generate_pipe_syntax(root.last_qep, show_cost=show_cost_var.get())
+            output.delete("1.0", "end")
+            output.insert("1.0", pipe_sql)
+
+    options_frame = ttk.Frame(app_frame)
+    options_frame.pack(pady=5)
+    ttk.Checkbutton(options_frame, text="Show Cost", variable=show_cost_var, command=update_output_from_toggle).pack(side="left", padx=5)
+
     def run_query():
         sql = query_input.get("1.0", "end").strip()
         if not sql:
@@ -74,15 +87,16 @@ def launch_gui():
             return
         try:
             qep = get_qep(sql, db_config=root.db_config)
-            pipe_sql = generate_pipe_syntax(qep)
+            root.last_qep = qep  # Save the QEP for reuse
+            pipe_sql = generate_pipe_syntax(qep, show_cost=show_cost_var.get())
             output.delete("1.0", "end")
             output.insert("1.0", pipe_sql)
         except Exception as e:
+            root.last_qep = None
             output.delete("1.0", "end")
             messagebox.showerror("Query Failed", f"An error occurred:\n{e}")
-            
+
     ttk.Button(app_frame, text="Generate Pipe-Syntax", command=run_query).pack()
 
     login_frame.tkraise()
     root.mainloop()
-
