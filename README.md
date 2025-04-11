@@ -2,5 +2,32 @@
 
 ---
 
-# If query cannot be executed
-check preprocessing.py and edit your details
+## Prerequisites
+
+- Python 3.8+
+- pip (Python package manager)
+- postgres database credentials 
+
+## Initial set-up
+- Create the TPC-H database in PostgreSQL first.
+- The data/zip file should have been given to you.
+
+## Setup Instructions
+
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd <repository-name>
+   ```
+
+2. **Create and activate virtual environment**:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
