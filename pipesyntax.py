@@ -39,7 +39,7 @@ def describe_node(plan, show_cost=True):
 
     elif node_type in ["Hash Join", "Merge Join", "Nested Loop"]:
         join_type = plan.get("Join Type", "INNER").upper()
-        if join_type == "RIGHT":
+        if join_type == "LEFT":
             join_type = "LEFT OUTER"
         cond = plan.get("Hash Cond") or plan.get("Merge Cond") or plan.get("Join Filter") or "<condition missing>"
         return f"|> {join_type} JOIN ON {cond}{cost_info}"
