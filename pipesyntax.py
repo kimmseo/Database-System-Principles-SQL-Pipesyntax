@@ -1,3 +1,7 @@
+import psycopg
+import decimal
+import json
+
 def generate_pipe_syntax(qep, show_cost=True):
     steps = []
     first_from = None
@@ -67,3 +71,114 @@ def describe_node(plan, show_cost=True):
     # Add more node types as needed...
 
     return f"|> {node_type.upper()}{cost_info}"
+
+
+# Round calculations to 2 dp
+def truncate_cost(a: float) -> float:
+    return round(a, 2)
+
+# Truncate to 4 dp
+def truncate(a: float) -> float:
+    return float(decimal.Decimal(str(a)).quantize(decimal.Decimal('.0001'), rounding=decimal.ROUND_DOWN))
+
+
+# Cache all variable from PostgreSQL
+# Lasts for each session (cleared when disconnected)
+cache = None
+class Cache():
+
+    def __init__(self, cur: psycopg.Cursor) -> None:
+        self.dict = {}
+        self.cur = cur
+
+    def query_setting(self, setting: str) -> str:
+        self.cur.execute(f"SELECT setting FROM pg_settings WHERE name = '{setting}'")
+        return self.cur.fetchall()[0][0]
+
+    # Gets the number of pages for a base relation
+    def query_pagecount(self, relation: str) -> int:
+        self.cur.execute(f"SELECT relpages FROM pg_class WHERE relname = '{relation}'")
+        return self.cur.fetchall()[0][0]
+
+    # Gets the number of tuples for a base relation
+    def query_tuplecount(self, relation: str) -> int:
+        self.cur.execute(f"SELECT reltuples FROM pg_class where relname = '{relation}'")
+        return self.cur.fetchall()[0][0]
+
+    def get_setting(self, setting: str) -> str:
+        key = f"setting/{setting}"
+        # query only if not present currently and save output
+        if key not in self.dict:
+            self.log_cb(f"Querying {key}")
+            self.dict[key] = self.query_setting(setting)
+        return self.dict[key]
+
+    def get_page_count(self, relation: str) -> int:
+        key = f"relpages/{relation}"
+        # query only if not present currently and save output
+        if key not in self.dict:
+            self.log_cb(f"Querying {key}")
+            self.dict[key] = self.query_pagecount(relation)
+        return self.dict[key]
+
+    def get_tuple_count(self, relation: str) -> int:
+        key = f"reltuples/{relation}"
+        # query only if not present currently and save output
+        if key not in self.dict:
+            self.log_cb(f"Querying {key}")
+            self.dict[key] = self.query_tuplecount(relation)
+        return self.dict[key]
+
+    # Check if auto analysis has been done
+    def set_tuple_count(self, relation: str, count: int):
+        key = f"reltuples/{relation}"
+        self.dict[key] = count
+
+    def set_log_cb(self, log_cb: callable):
+        self.log_cb = log_cb
+
+
+# Count the number of clauses in a filter or similar condition
+# Assume clause can only be connected by 'OR' or 'AND;
+def count_clauses(condition: str) -> int:
+    or_count = condition.count(') OR (')
+    and_count = condition.count(') AND (')
+    total_count = or_count + and_count + 1
+
+    return total_count
+
+# Return @ cost of sequential scan
+def cost_seqscan(node: dict) -> float:
+    cpu_tuple_cost = float(cache.get_setting("cpu_tuple_cost"))
+    seq_page_cost = float(cache.get_setting("seq_page_cost"))
+    rel = node["Relation Name"]
+    page_count = cache.get_page_count(rel)
+    row_count = cache.get_tuple_count(rel)
+    workers = 1
+    filter_cost = 0
+
+    if "Filter" in node:
+        filters = count_clauses(node["Filter"])
+        cpu_operator_cost = float(cache.get_setting("cpu_operator_cost"))
+        filter_cost = filters * cpu_operator_cost
+
+    cpu_cost = (cpu_tuple_cost + filter_cost) * row_count
+
+    # Parallelization
+    if node["Parallel Aware"] and "Workers Planned" in node:
+        workers = node["Workers Planned"]
+        if cache.get_setting("parallel_leader_participation") == "on" and workers < 4:
+            workers += 1 - (workers * 0.3)
+
+    disk_cost = seq_page_cost * page_count
+    cost = truncate_cost(cpu_cost / workers + disk_cost)
+
+    # Reverse all the calculations to get the expected filter cost
+    expected_cost = node["Total Cost"]
+    if cost != expected_cost:
+        expected_cost -= disk_cost
+        expected_cost /= row_count
+        expected_cost *= workers
+        expected_cost -= cpu_tuple_cost
+
+    return cost
