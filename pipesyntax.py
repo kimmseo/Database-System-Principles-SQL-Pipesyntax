@@ -71,13 +71,3 @@ def describe_node(plan, show_cost=True):
     # Add more node types as needed...
 
     return f"|> {node_type.upper()}{cost_info}"
-
-
-# Round calculations to 2 dp
-def truncate_cost(a: float) -> float:
-    return round(a, 2)
-
-# Truncate to 4 dp
-def truncate(a: float) -> float:
-    return float(decimal.Decimal(str(a)).quantize(decimal.Decimal('.0001'), rounding=decimal.ROUND_DOWN))
-
