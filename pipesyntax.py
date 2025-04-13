@@ -1,4 +1,4 @@
-import psycopg
+import psycopg2
 import decimal
 import json
 
