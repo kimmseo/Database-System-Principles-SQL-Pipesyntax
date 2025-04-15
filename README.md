@@ -1,3 +1,5 @@
+[Google Docs Project Report](https://docs.google.com/document/d/1tzsdEW6uhxPPNy-L0tftqWJqLooriUtY8ppRB_JsoT0/edit?usp=sharing)
+
 # SC3020/CZ4031 Database System Principles Project 2 Group 12
 
 ---
