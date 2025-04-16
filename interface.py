@@ -1,6 +1,6 @@
 import sv_ttk
 from tkinter import ttk, Tk, scrolledtext, StringVar, BooleanVar, messagebox
-from preprocessing import get_qep
+from preprocessing import get_qep, get_qep_mysql
 from pipesyntax import generate_pipe_syntax 
 
 
@@ -19,6 +19,7 @@ def build_login_frame(root, login_frame, app_frame):
     ttk.Label(inner, text="Enter Database Credentials", font=("Segoe UI", 14)).pack(pady=10)
 
     host = StringVar(value="localhost")
+    dbms = StringVar(value="postgresql")
     port = StringVar(value="5432")
     user = StringVar(value="postgres")
     password = StringVar()
@@ -26,6 +27,7 @@ def build_login_frame(root, login_frame, app_frame):
 
     for label, var in [
         ("Host:", host),
+        ("DBMS:", dbms),
         ("Port:", port),
         ("Username:", user),
         ("Password:", password),
@@ -42,6 +44,8 @@ def build_login_frame(root, login_frame, app_frame):
             messagebox.showerror("Login Error", "All fields must be filled in.")
             return
 
+        root.database_type = dbms.get()
+
         root.db_config = {
             "host": host.get(),
             "port": port.get(),
@@ -50,13 +54,26 @@ def build_login_frame(root, login_frame, app_frame):
             "dbname": dbname.get()
         }
 
-        try:
-            import psycopg2
-            conn = psycopg2.connect(**root.db_config)
-            conn.close()
-        except Exception as e:
-            messagebox.showerror("Connection Failed", f"Could not connect to the database:\n{e}")
+        if root.database_type.lower() == "postgres" or root.database_type.lower() == "postgresql":
+            try:
+                import psycopg2
+                conn = psycopg2.connect(**root.db_config)
+                conn.close()
+            except Exception as e:
+                messagebox.showerror("Connection Failed", f"Could not connect to the database:\n{e}")
+                return
+        elif root.database_type.lower() == "mysql":
+            try:
+                import mysql.connector
+                conn = mysql.connector.connect(**root.db_config)
+                conn.close()
+            except Exception as e:
+                messagebox.showerror("Connection Failed", f"Could not connect to the database:\n{e}")
+                return
+        else:
+            messagebox.showerror("Connection Failed", "Unsupported database\n")
             return
+
 
         app_frame.tkraise()
 
@@ -129,7 +146,10 @@ def build_app_frame(root, app_frame):
             messagebox.showwarning("No Query", "Please enter an SQL query.")
             return
         try:
-            qep = get_qep(sql, db_config=root.db_config)
+            if root.database_type.lower() == "postgres" or root.database_type.lower() == "postgresql":
+                qep = get_qep(sql, db_config=root.db_config)
+            if root.database_type.lower() == "mysql":
+                qep = get_qep_mysql(sql, db_config=root.db_config)
             root.last_qep = qep
             pipe_sql = generate_pipe_syntax(qep, show_cost=show_cost_var.get())
             output.delete("1.0", "end")
