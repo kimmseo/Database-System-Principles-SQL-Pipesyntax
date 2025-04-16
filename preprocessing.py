@@ -394,3 +394,14 @@ class Visualizer(object):
             height=height,
         )
         return fig
+import mysql.connector
+
+def get_qep_mysql(sql_query, db_config):
+    conn = mysql.connector.connect(**db_config)
+    cur = conn.cursor(dictionary=True)
+    cur.execute(f"EXPLAIN FORMAT=JSON {sql_query}")
+    result = cur.fetchone()[0]
+    #print(result)
+    cur.close()
+    conn.close()
+    return result[0]

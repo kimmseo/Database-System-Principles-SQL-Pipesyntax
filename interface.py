@@ -1,6 +1,6 @@
 import webbrowser
 from tkinter import ttk, Tk, scrolledtext, StringVar, messagebox
-from preprocessing import get_qep
+from preprocessing import get_qep, get_qep_mysql
 from pipesyntax import generate_pipe_syntax
 from preprocessing import parse_query_explanation_to_tree, Visualizer
 from sv_ttk import set_theme
@@ -16,12 +16,20 @@ def build_login_frame(root, login_frame, app_frame):
     ttk.Label(inner, text="Enter Database Credentials", font=("Segoe UI", 14)).pack(pady=10)
 
     host = StringVar(value="localhost")
+    dbms = StringVar(value="postgresql")
     port = StringVar(value="5432")
     user = StringVar(value="postgres")
     password = StringVar()
     dbname = StringVar(value="TPC-H")
 
-    for label, var in [("Host:", host), ("Port:", port), ("Username:", user), ("Password:", password), ("Database:", dbname)]:
+    for label, var in [
+        ("Host:", host),
+        ("DBMS:", dbms),
+        ("Port:", port),
+        ("Username:", user),
+        ("Password:", password),
+        ("Database:", dbname)
+    ]:
         frame = ttk.Frame(inner)
         frame.pack(pady=5)
         ttk.Label(frame, text=label, width=10).pack(side="left")
@@ -32,17 +40,36 @@ def build_login_frame(root, login_frame, app_frame):
         if not all([host.get(), port.get(), user.get(), password.get(), dbname.get()]):
             messagebox.showerror("Login Error", "All fields must be filled in.")
             return
+
+        root.database_type = dbms.get()
+
         root.db_config = {
             "host": host.get(), "port": port.get(), "user": user.get(),
             "password": password.get(), "dbname": dbname.get()
         }
-        try:
-            import psycopg2
-            conn = psycopg2.connect(**root.db_config)
-            conn.close()
-            app_frame.tkraise()
-        except Exception as e:
-            messagebox.showerror("Connection Failed", f"Could not connect:\n{e}")
+
+        if root.database_type.lower() == "postgres" or root.database_type.lower() == "postgresql":
+            try:
+                import psycopg2
+                conn = psycopg2.connect(**root.db_config)
+                conn.close()
+            except Exception as e:
+                messagebox.showerror("Connection Failed", f"Could not connect to the database:\n{e}")
+                return
+        elif root.database_type.lower() == "mysql":
+            try:
+                import mysql.connector
+                conn = mysql.connector.connect(**root.db_config)
+                conn.close()
+            except Exception as e:
+                messagebox.showerror("Connection Failed", f"Could not connect to the database:\n{e}")
+                return
+        else:
+            messagebox.showerror("Connection Failed", "Unsupported database\n")
+            return
+
+
+        app_frame.tkraise()
 
     ttk.Button(inner, text="Connect", command=handle_login).pack(pady=10)
 
@@ -69,9 +96,12 @@ def build_app_frame(root, app_frame):
             messagebox.showwarning("Empty Query", "Please enter an SQL query.")
             return
         try:
-            qep = get_qep(sql, db_config=root.db_config, as_json=False)
+            if root.database_type.lower() == "postgres" or root.database_type.lower() == "postgresql":
+                qep = get_qep(sql, db_config=root.db_config, as_json=False)
             exec_tree = parse_query_explanation_to_tree(qep)
             exec_tree.finalize_id()
+            if root.database_type.lower() == "mysql":
+                qep = get_qep_mysql(sql, db_config=root.db_config)
             root.last_qep = qep
             root.exec_tree = exec_tree
             exec_tree.qep = qep
