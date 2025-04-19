@@ -2,3 +2,4 @@ psycopg2
 sv-ttk
 plotly
 igraph
+mysql-connector-python
