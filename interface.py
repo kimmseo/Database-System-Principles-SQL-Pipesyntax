@@ -135,6 +135,19 @@ def update_plotly_browser(exec_tree, sql, db_config):
     pipe_with_cost_html = html.escape(pipe_sql_with_cost)
     pipe_without_cost_html = html.escape(pipe_sql_without_cost)
 
+    # 1. Get cost breakdown
+    cost_info = exec_tree.get_cost()
+    total_cost = cost_info["total_cost"]
+    startup_cost = cost_info["startup_cost"]
+    cost_steps = cost_info["steps"]
+
+    # 2. Generate cost breakdown HTML
+    step_cost_html = "<ul style='padding-left: 20px;'>"
+    for step in cost_steps:
+        cond_str = f" — Conditions: {', '.join(step['condition'])}" if step["condition"] else ""
+        step_cost_html += f"<li><b>{step['operation']}</b> → Step Cost: {step['net_cost']}{cond_str}</li>"
+    step_cost_html += "</ul>"
+
     # 3. HTML Template with JS toggle
     combined_html = f"""
     <html>
@@ -162,6 +175,10 @@ def update_plotly_browser(exec_tree, sql, db_config):
         <div id="without_cost" style="display:none; margin-top:10px;">
             <pre style='background:#f9f9f9;color:#222;padding:15px;border-radius:8px;'>{pipe_without_cost_html}</pre>
         </div>
+        <h2 style="margin-top:40px;">Step-wise Cost Breakdown</h2>
+        <p><b>Total Startup Cost:</b> {round(startup_cost, 2)}<br>
+        <b>Total Cost:</b> {round(total_cost, 2)}</p>
+        {step_cost_html}
     </body>
     </html>
     """

@@ -248,11 +248,32 @@ class ExecutionTree:
         nodes = self.traversal()
         total_cost = 0
         startup_cost = 0
+        cost_breakdown = []
+
         for node in nodes:
+            # Sum of children total costs
+            child_cost_sum = sum(child.total_cost for child in node.children)
+
+            # Net cost = total - children (the cost of just this step)
+            net_cost = node.total_cost - child_cost_sum
+
             total_cost += node.total_cost
             startup_cost += node.startup_cost
-        return total_cost, startup_cost
 
+            cost_breakdown.append({
+                "id": node.id,
+                "operation": node.operation,
+                "startup_cost": round(node.startup_cost, 2),
+                "total_cost": round(node.total_cost, 2),
+                "net_cost": round(net_cost, 2),
+                "condition": node.condition
+            })
+
+        return {
+            "total_cost": round(total_cost, 2),
+            "startup_cost": round(startup_cost, 2),
+            "steps": cost_breakdown
+        }
 def parse_query_explanation_to_tree(explanation: List[Tuple[str]]) -> ExecutionTree:
     # Parsing a query explanation into a tree
     tree = ExecutionTree()
